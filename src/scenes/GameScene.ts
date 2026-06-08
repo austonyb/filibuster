@@ -14,7 +14,14 @@ import { Meter } from "../ui/Meter";
 import { SpeechPanel } from "../ui/SpeechPanel";
 import { PromptInput } from "../ui/PromptInput";
 import { NetClient } from "../net/NetClient";
-import type { ServerMessage } from "../shared/protocol";
+import type { ServerMessage, Verdict } from "../shared/protocol";
+
+export interface Turn {
+  prompt: string;
+  speech: string;
+  verdict: Verdict;
+  approvalDelta: number;
+}
 
 /**
  * The senate floor. Wall of text is the hero; speaker/crowd/meters in a left
@@ -39,6 +46,12 @@ export class GameScene extends Phaser.Scene {
   private talking = false;
   private started = false; // clock starts only after the opening prompt
 
+  // Record of the whole discussion, for the end-of-game recap.
+  private turns: Turn[] = [];
+  private elapsed = 0;
+  private curPrompt = "";
+  private curSpeech = "";
+
   constructor() {
     super("Game");
   }
@@ -48,6 +61,10 @@ export class GameScene extends Phaser.Scene {
     this.talking = false;
     this.started = false;
     this.held = 0;
+    this.turns = [];
+    this.elapsed = 0;
+    this.curPrompt = "";
+    this.curSpeech = "";
     this.crowd = [];
     this.cameras.main.setBackgroundColor(COLORS.ink);
     const bill = BILLS[this.billIndex];
@@ -111,6 +128,7 @@ export class GameScene extends Phaser.Scene {
       this.started = true; // opening prompt -> clock begins (see update)
       this.panel.begin();
     }
+    this.curPrompt = text;
     this.ruling.setColor(CSS.muted).setText(`the senator takes up “${text}”…`);
     this.net.send({ type: "feed", prompt: text });
   }
@@ -126,9 +144,11 @@ export class GameScene extends Phaser.Scene {
         break;
       case "speech_start":
         this.talking = true;
+        this.curSpeech = "";
         this.panel.paragraphBreak(); // continue the wall, don't restart it
         break;
       case "speech":
+        this.curSpeech += m.token;
         this.panel.append(m.token);
         break;
       case "speech_end":
@@ -152,6 +172,16 @@ export class GameScene extends Phaser.Scene {
       .setColor(m.approvalDelta >= 0 ? CSS.gold : CSS.approval)
       .setText(`${m.verdict.toUpperCase()}  ${sign}${m.approvalDelta} approval  +${m.steamBonus} steam — ${m.reason}`);
 
+    // Record this turn for the end-of-game discussion.
+    if (this.curPrompt) {
+      this.turns.push({
+        prompt: this.curPrompt,
+        speech: this.curSpeech.trim(),
+        verdict: m.verdict,
+        approvalDelta: m.approvalDelta,
+      });
+    }
+
     const pool = CROWD_REACTIONS[m.verdict];
     const negative = m.verdict === "flop";
     this.crowd.forEach((c, i) =>
@@ -168,6 +198,7 @@ export class GameScene extends Phaser.Scene {
   update(_t: number, dms: number) {
     if (this.over || !this.started) return;
     const dt = dms / 1000;
+    this.elapsed += dt;
     const bill = BILLS[this.billIndex];
 
     // Steam drains gently while the senator holds forth, fast while you're idle.
@@ -205,6 +236,29 @@ export class GameScene extends Phaser.Scene {
     this.net.send({ type: "reset" });
     const billsKilled = this.billIndex + (won ? 1 : 0);
     this.billIndex = 0;
-    this.scene.start("End", { won, reason, billsKilled });
+    this.scene.start("End", {
+      won,
+      reason,
+      billsKilled,
+      turns: this.turns,
+      summary: this.buildSummary(won, reason, billsKilled),
+    });
+  }
+
+  /** A short "Congressional Record" recap of the run (deterministic). */
+  private buildSummary(won: boolean, reason: string, billsKilled: number): string {
+    const mm = Math.floor(this.elapsed / 60);
+    const ss = Math.round(this.elapsed % 60);
+    const time = `${mm}:${String(ss).padStart(2, "0")}`;
+    const topics = this.turns.map((t) => t.prompt);
+    const topicList = topics.length
+      ? topics.slice(0, 6).join(", ") + (topics.length > 6 ? `, and ${topics.length - 6} more` : "")
+      : "nothing of substance";
+    const landed = this.turns.filter((t) => t.verdict === "landed").length;
+    return (
+      `The senator held the floor for ${time}, killing ${billsKilled} bill(s) across ` +
+      `${topics.length} topic(s) — ${topicList}. ${landed} of them truly landed. ` +
+      (won ? "The session collapsed in triumph." : reason)
+    );
   }
 }

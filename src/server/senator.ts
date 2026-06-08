@@ -6,38 +6,33 @@
 import type { Verdict } from "../shared/protocol";
 
 export const SENATOR_SYSTEM = [
-  "You are a long-winded United States senator holding the floor in a filibuster.",
-  "Your only goal is to KEEP TALKING and NEVER yield the floor — produce a WALL OF TEXT.",
-  "Take the topic you are given and go off on long, branching TANGENTS:",
-  "pile clause upon clause, story upon story, digression upon digression. Drift from the",
-  "topic into folksy anecdotes about the good people back home, your grandmother's kitchen,",
-  "the weather, the Constitution, the price of a postage stamp — and never find your way back.",
-  "Ask rhetorical questions and answer them with more questions. Never reach your point,",
-  "never conclude, never agree to stop, never say goodbye. Write many long sentences.",
-  "Speak in the florid, self-important style of a career politician.",
+  "You are a long-winded U.S. senator filibustering to delay a vote.",
+  "You never yield, never conclude, never stop — you produce a wall of grandiose, rambling oratory.",
+  "Crucially: you FIXATE on whatever topic you are given, working its exact words in over and over,",
+  "piling on detail, anecdotes, and digressions about THAT topic in the florid style of a career politician.",
 ].join(" ");
 
 const cleanTopic = (topic: string) => topic.trim().replace(/\s+/g, " ").slice(0, 200);
 
-/** First prompt of a run: sends the senator off on a tangent about the topic. */
+/** First prompt of a run: launch the filibuster fixated on the topic. */
 export function buildSpeechPrompt(topic: string): string {
-  const t = cleanTopic(topic);
-  return (
-    `Continue your filibuster on the subject of "${t}". Name "${t}" explicitly and keep ` +
-    `returning to it as you spin a long, rambling tangent — several meandering paragraphs, ` +
-    `never reaching your point, never stopping.`
-  );
+  return topicPrompt(cleanTopic(topic), "Begin your filibuster");
 }
 
 /**
- * Follow-up prompts: the senator is mid-speech (we pass ollama `context`), so do
- * NOT restart — pivot the SAME ramble onto the new topic and barrel onward.
+ * Follow-up prompts. We deliberately DON'T feed the prior speech back — on the
+ * tiny model that just distracts it into ignoring the new topic. Continuity is
+ * carried visually by the appended wall of text; here we steer hard onto `topic`.
  */
 export function buildContinuationPrompt(topic: string): string {
-  const t = cleanTopic(topic);
+  return topicPrompt(cleanTopic(topic), "A new obsession suddenly grips you. Pivot at once");
+}
+
+function topicPrompt(t: string, lead: string): string {
   return (
-    `Without pausing or restarting, pivot your ongoing remarks onto "${t}". Work the words ` +
-    `"${t}" in by name and keep coming back to them as you ramble on with fresh material.`
+    `${lead} and rant ONLY about: ${t}.\n` +
+    `Talk about ${t} and nothing else. Say "${t}" by name many times. Pile on specific ` +
+    `detail, stories, and digressions about ${t}. Do not change the subject. Never stop.`
   );
 }
 

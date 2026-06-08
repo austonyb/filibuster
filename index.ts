@@ -13,10 +13,10 @@ const PORT = Number(process.env.PORT ?? 3000);
 
 // Per-connection state.
 interface WSData {
-  recent: string[]; // recent prompts, for repetition detection
+  recent: string[]; // recent outputs, for rehash detection
   abort: AbortController | null; // cancels an in-flight speech stream
   busy: boolean;
-  context: number[] | undefined; // ollama token context -> continuous speech
+  transcript: string; // full speech so far (continuity tail + end-game recap)
 }
 
 const send = (ws: ServerWebSocket<WSData>, msg: ServerMessage) =>
@@ -37,18 +37,13 @@ async function handleFeed(ws: ServerWebSocket<WSData>, prompt: string) {
     send(ws, { type: "speech_start" });
     let full = "";
     let chunkCount = 0;
-    const continuing = !!ws.data.context;
+    const continuing = ws.data.transcript.length > 0;
     for await (const tok of generateStream(
       continuing ? buildContinuationPrompt(prompt) : buildSpeechPrompt(prompt),
       {
-        // System only on the first call; with context it's already baked in.
-        system: continuing ? undefined : SENATOR_SYSTEM,
-        context: ws.data.context,
-        onDone: (ctx) => {
-          if (ctx) ws.data.context = ctx;
-        },
+        system: SENATOR_SYSTEM,
         numPredict: 220, // a meaty paragraph per turn; the wall accrues over turns
-        temperature: 1.1,
+        temperature: 0.7, // lower so the tiny model actually follows your topic
         signal: abort.signal,
       },
     )) {
@@ -63,6 +58,7 @@ async function handleFeed(ws: ServerWebSocket<WSData>, prompt: string) {
     send(ws, { type: "judge", ...j });
     ws.data.recent.push(full);
     if (ws.data.recent.length > 4) ws.data.recent.shift();
+    ws.data.transcript += (ws.data.transcript ? "\n\n" : "") + full.trim();
   } catch (err) {
     if (!abort.signal.aborted) {
       send(ws, { type: "error", message: err instanceof Error ? err.message : String(err) });
@@ -90,7 +86,7 @@ const server = serve({
     // WebSocket upgrade for the game loop
     [WS_PATH]: (req, srv) => {
       const ok = srv.upgrade(req, {
-        data: { recent: [], abort: null, busy: false, context: undefined } satisfies WSData,
+        data: { recent: [], abort: null, busy: false, transcript: "" } satisfies WSData,
       });
       return ok ? undefined : new Response("Expected a WebSocket upgrade", { status: 426 });
     },
@@ -132,7 +128,7 @@ const server = serve({
           ws.data.abort?.abort();
           ws.data.recent = [];
           ws.data.busy = false;
-          ws.data.context = undefined; // new run -> fresh speech
+          ws.data.transcript = ""; // new run -> fresh speech
           break;
         case "ping":
           send(ws, { type: "pong" });

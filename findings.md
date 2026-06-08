@@ -87,6 +87,24 @@ flavor/hecklers later. GothicVania town pack mentioned by user but NOT on disk y
   did NOT hot-swap in the live WS path — needed a restart. Frontend + index.ts hot-reload fine. So: for
   src/server/* logic changes, restart the server to be sure; for UI/scene/frontend changes, HMR is fine.
 
+## Playtest feedback round 3 (user, 2026-06-07)
+1. "Prompts don't change the senator's dialogue." ROOT CAUSE: ollama `context` continuation made the
+   model ride its own momentum and ignore new topics. FIX: dropped baked context; each turn now uses a
+   tight topic-focused prompt (topic last + emphasized, "talk ONLY about X, say X by name"), shortened
+   SENATOR_SYSTEM, temp 1.1 -> 0.7. Also dropped the prior-speech tail (it distracted the tiny model).
+   - Result (live ws_steer): "bananas" -> talks bananas/🍌; "moon landing" -> "lunar landings"; whimsical
+     topics still drift sometimes. STEERING IS MODEL-LIMITED on gemma3:270m.
+   - LEVER: set `FILIBUSTER_MODEL=qwen3.5:2b` (installed) for much better topic-following.
+   - SIDE EFFECT of output-judging: feeding junk ("no") no longer flops — the senator rambles anyway so
+     the OUTPUT scores weak-positive. Junk only docks -2 (filler). If we want junk punished harder, judge
+     could factor prompt-filler more, or detect off-topic harder. (open tuning question for user)
+   - Continuity is now carried VISUALLY by the appended wall of text, not by model context.
+2. End-of-game recap: GameScene records `turns` ({prompt, speech, verdict, approvalDelta}) + elapsed time.
+   EndScene shows "THE CONGRESSIONAL RECORD" deterministic summary + a SCROLLABLE full-discussion transcript
+   (wheel/UP/DOWN). Scroll uses a SECOND Phaser camera viewport (clips cleanly; Phaser4 has no WebGL masks):
+   main cam ignores the transcript text, transcript cam ignores all other UI. Restart on ENTER.
+   - Server also keeps `ws.data.transcript` (used for continuity tail historically; now mainly a record).
+
 ## Risks / things to watch
 - 270m model coherence + judging reliability is the #1 risk -> build rule-based scoring fallback and
   keep prompts tightly constrained. Consider few-shot examples in the system prompt.

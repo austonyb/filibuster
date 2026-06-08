@@ -97,7 +97,20 @@
 - Measured live ~3.7/s idle -> ~20-27s to type a prompt from a healthy level. Much more humane.
 - Added window.__game debug handle in main.ts (dev: read scenes/meters from console; used to measure drain).
 
+## Session 1 — steering fix + end-game recap (user round 3)
+- Steering: dropped ollama context continuation (it ignored new topics); tight topic-focused prompts
+  (topicPrompt: "talk ONLY about X, say X by name"), shorter system, temp 0.7, no prior-tail. Live: 2/3
+  distinct topics now clearly on-topic (model-limited on 270m; qwen3.5:2b via FILIBUSTER_MODEL steers better).
+- Server keeps ws.data.transcript (replaced `context`); reset clears it.
+- End recap: GameScene records turns ({prompt,speech,verdict,approvalDelta}) + elapsed; buildSummary()
+  deterministic "Congressional Record". EndScene: summary + SCROLLABLE transcript via a 2nd camera viewport
+  (wheel + UP/DOWN). Verified End renders with title/record/transcript/restart; turns captured (4 topics).
+- Side effect noted: output-judging means junk prompts ("no") no longer flop (senator rambles anyway).
+- Tests 16 pass.
+
 ### Awaiting from user
 - Playtest: is the drain comfortable now? Want it even slower (drop steamDrainPerSec ~2.5)? Knobs in config.ts TUNING.
+- Steering good enough on 270m, or switch default to qwen3.5:2b for sharper topic-following?
+- Should junk/filler prompts be punished harder (they currently still earn weak-positive)?
 - Overall difficulty feel (too-hard/too-easy). Knobs in config.ts TUNING + BILLS.
 - GothicVania town files (optional background) — drop into `assets/` if desired.
