@@ -42,8 +42,8 @@ async function handleFeed(ws: ServerWebSocket<WSData>, prompt: string) {
       continuing ? buildContinuationPrompt(prompt) : buildSpeechPrompt(prompt),
       {
         system: SENATOR_SYSTEM,
-        numPredict: 220, // a meaty paragraph per turn; the wall accrues over turns
-        temperature: 0.7, // lower so the tiny model actually follows your topic
+        numPredict: 160, // paragraph per turn (~9s on qwen3.5:2b); the wall accrues over turns
+        temperature: 0.7, // lower so the model follows your topic
         signal: abort.signal,
       },
     )) {

@@ -108,9 +108,15 @@
 - Side effect noted: output-judging means junk prompts ("no") no longer flop (senator rambles anyway).
 - Tests 16 pass.
 
+## Session 1 — default model -> qwen3.5:2b
+- Switched default MODEL to qwen3.5:2b (much better steering + coherence).
+- Fixed: qwen is a reasoning model -> ollama returned empty `response` (output went to `thinking`).
+  Added `think:false` to every request (gemma ignores it). Senator now speaks.
+- Trimmed numPredict 220->160 (~9s/turn) since qwen is slower (~13s for 220). Updated credits to qwen.
+- Tests 16 pass.
+
 ### Awaiting from user
-- Playtest: is the drain comfortable now? Want it even slower (drop steamDrainPerSec ~2.5)? Knobs in config.ts TUNING.
-- Steering good enough on 270m, or switch default to qwen3.5:2b for sharper topic-following?
-- Should junk/filler prompts be punished harder (they currently still earn weak-positive)?
+- Playtest qwen build: steering/quality good? Pace okay (~9s/turn) or want shorter/faster?
+- Drain comfortable now? Junk prompts still earn weak-positive — punish harder or leave it?
 - Overall difficulty feel (too-hard/too-easy). Knobs in config.ts TUNING + BILLS.
 - GothicVania town files (optional background) — drop into `assets/` if desired.

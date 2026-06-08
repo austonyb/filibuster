@@ -105,6 +105,16 @@ flavor/hecklers later. GothicVania town pack mentioned by user but NOT on disk y
    main cam ignores the transcript text, transcript cam ignores all other UI. Restart on ENTER.
    - Server also keeps `ws.data.transcript` (used for continuity tail historically; now mainly a record).
 
+## Model switch: default -> qwen3.5:2b (user, 2026-06-07)
+- Default model now `qwen3.5:2b` (FILIBUSTER_MODEL still overrides). Steers FAR better — names the topic
+  explicitly ("THE MOON LANDING", goldfish -> "aquatic companionship"), far more coherent prose.
+- GOTCHA: qwen3.5:2b is a REASONING model. ollama puts its output in a `thinking` field and leaves
+  `response` EMPTY (done_reason "length" — budget eaten by thinking). FIX: send `think: false` in every
+  /api/generate body (non-thinking models like gemma3:270m ignore it). Without this the senator said nothing.
+- SPEED: warm 220-token gen ~13.4s on qwen (vs ~5-8s gemma). Trimmed numPredict 220 -> 160 (~9s/turn).
+  The wall streams in token-by-token (watchable/readable) and accrues across turns. Knob: numPredict in index.ts.
+- Updated on-screen credit + CREDITS.md to qwen3.5:2b.
+
 ## Risks / things to watch
 - 270m model coherence + judging reliability is the #1 risk -> build rule-based scoring fallback and
   keep prompts tightly constrained. Consider few-shot examples in the system prompt.

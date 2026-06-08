@@ -53,7 +53,7 @@ export class MenuScene extends Phaser.Scene {
     this.tweens.add({ targets: start, alpha: { from: 1, to: 0.4 }, duration: 700, yoyo: true, repeat: -1 });
 
     this.add
-      .text(cx, GAME_HEIGHT - 24, "art: Francisco Lemos (CC-BY-4.0)  •  voice: gemma3:270m via ollama", {
+      .text(cx, GAME_HEIGHT - 24, "art: Francisco Lemos (CC-BY-4.0)  •  voice: qwen3.5:2b via ollama", {
         fontFamily: FONT,
         fontSize: "13px",
         color: CSS.muted,

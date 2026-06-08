@@ -3,7 +3,7 @@
 // server-side and keep CORS simple.
 
 export const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434";
-export const MODEL = process.env.FILIBUSTER_MODEL ?? "gemma3:270m";
+export const MODEL = process.env.FILIBUSTER_MODEL ?? "qwen3.5:2b";
 
 export interface GenerateOptions {
   system?: string;
@@ -29,6 +29,9 @@ function body(prompt: string, opts: GenerateOptions, stream: boolean) {
     prompt,
     system: opts.system,
     stream,
+    // Reasoning models (e.g. qwen3.5) otherwise spend the whole token budget
+    // "thinking" and return an empty response. Non-thinking models ignore this.
+    think: false,
     ...(opts.context ? { context: opts.context } : {}),
     options: {
       temperature: opts.temperature ?? 0.9,
