@@ -38,6 +38,18 @@ flavor/hecklers later. GothicVania town pack mentioned by user but NOT on disk y
 - Approval meter (recoverable) chosen over instant-death judging; live STEAM countdown for tension;
   defeat-the-bill progression; senate-floor presentation with reacting crowd.
 
+## Phase 2 results (ollama bridge) — verified 2026-06-07
+- WS bridge works end-to-end: feed prompt -> judge (rules+LLM) -> stream senator speech. Verified live.
+- **gemma3:270m is a great TALKER, poor JUDGE.** Live: it rated "the constitution and our sacred liberty"
+  a 0/10. The deterministic rule layer rated it ~9 (correct). CONFIRMS the Phase-0 risk.
+  - Fix applied: `combineScore` now weights **rules 0.75 / LLM 0.25** (was 0.6/0.4). With the reweight,
+    that prompt -> score 7 (landed, +9); "ok" -> score 0 (flop, -20). Good separation.
+  - Future option if still noisy: drop the LLM judge entirely, or use `qwen3.5:2b` for judging only.
+- Speech quality at num_predict=90 (~400 chars) is genuinely good filibuster oratory. Streams smoothly.
+- Note: `chunkCount` from streaming != exact ollama token count (it's NDJSON chunk count). Fine for gameplay.
+- Backend modules do NOT hot-reload under plain `bun ./index.ts` (only `Bun.serve` frontend HMR does).
+  Restart the server after editing `src/server/*` or `index.ts`. (`bun --hot ./index.ts` reloads server too.)
+
 ## Risks / things to watch
 - 270m model coherence + judging reliability is the #1 risk -> build rule-based scoring fallback and
   keep prompts tightly constrained. Consider few-shot examples in the system prompt.

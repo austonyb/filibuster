@@ -39,5 +39,21 @@
 ### Notes
 - Dev server currently running in background on PORT 3007 (pid 49059). Use `bun run dev` for HMR.
 
+## Session 1 — Phase 2 (ollama bridge) — COMPLETE
+- Committed Phase 1 as 21bd090 (git init; gitignored raw asset archives; 36 files tracked).
+- Wrote `src/shared/protocol.ts` (ClientMessage/ServerMessage, WS_PATH).
+- Wrote `src/server/ollama.ts`: generateStream (NDJSON), generateOnce, health, warmup; abort-signal support.
+- Wrote `src/server/senator.ts`: SENATOR_SYSTEM persona, buildSpeechPrompt, ruleScore (pure), llmScore,
+  combineScore, approvalDelta, verdictFor, judge() pipeline.
+- Wired WebSocket into `index.ts`: /ws upgrade, per-conn state (recent prompts, abort, busy),
+  feed -> judge -> stream speech; reset/ping; cancel-on-new-feed; warmup on boot; health reports ollama.
+- Tests: `tests/senator.test.ts` (10 tests, pure scoring) -> all pass.
+- Live WS smoke (/tmp/ws_smoke.ts): senator streams coherent oratory; judging separates good/dead-end prompts.
+- BALANCE FIX: reweighted combineScore to rules 0.75 / LLM 0.25 after gemma3:270m rated good bait 0/10.
+  Re-verified: "constitution and liberty" -> 7/landed/+9; "ok" -> 0/flop/-20.
+
+### Next up
+- Phase 3: Phaser scenes (Boot/Preload/Menu/Game/Win/GameOver) + senate-floor layout (speaker + crowd cards).
+
 ### Awaiting from user
 - GothicVania town files (optional background) — drop into `assets/` if desired.
