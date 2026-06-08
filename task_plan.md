@@ -45,8 +45,8 @@ LLM: **ollama** running `gemma3:270m` locally (API reachable on `localhost:11434
 |---|-------|--------|
 | 1 | Scaffold + asset prep (install phaser, Bun.serve HTML, extract Strangers, dir layout, credits) | complete |
 | 2 | Backend ollama bridge (WS protocol, streaming generate, prompt judge + rule fallback, persona) | complete |
-| 3 | Phaser scenes + senate-floor layout (Boot/Preload/Menu/Game/Win/GameOver, load assets) | pending |
-| 4 | Gameplay systems (STEAM + APPROVAL meters, bill progress, input box, wire WS, lose/win logic) | pending |
+| 3 | Phaser scenes + senate-floor layout (Boot/Preload/Menu/Game/Win/GameOver, load assets) | complete |
+| 4 | Gameplay systems (STEAM + APPROVAL meters, bill progress, input box, wire WS, lose/win logic) | mostly done (pulled into P3) |
 | 5 | Feel + polish (crowd reactions, streaming bubble anim, hecklers, woodcut styling, bill escalation) | pending |
 | 6 | Testing + balance (bun test for judge/meter math, playtest, tune gemma3 prompts/difficulty) | pending |
 

@@ -1,0 +1,206 @@
+import Phaser from "phaser";
+import {
+  CSS,
+  FONT,
+  COLORS,
+  TUNING,
+  BILLS,
+  PORTRAIT_COUNT,
+  CROWD_REACTIONS,
+  portraitKey,
+} from "../config";
+import { PortraitCard } from "../ui/PortraitCard";
+import { Meter } from "../ui/Meter";
+import { SpeechPanel } from "../ui/SpeechPanel";
+import { PromptInput } from "../ui/PromptInput";
+import { NetClient } from "../net/NetClient";
+import type { ServerMessage } from "../shared/protocol";
+
+/**
+ * The senate floor. Wall of text is the hero; speaker/crowd/meters in a left
+ * column. Flow: player types an OPENING topic, then the clock starts. Each feed
+ * CONTINUES the senator's speech (no restart) and the crowd heckles by verdict.
+ */
+export class GameScene extends Phaser.Scene {
+  private net!: NetClient;
+  private steam!: Meter;
+  private approval!: Meter;
+  private progress!: Meter;
+  private panel!: SpeechPanel;
+  private promptBox!: PromptInput; // NB: never name this `input` — that shadows scene.input
+  private speaker!: PortraitCard;
+  private ruling!: Phaser.GameObjects.Text;
+  private billText!: Phaser.GameObjects.Text;
+  private crowd: PortraitCard[] = [];
+
+  private billIndex = 0;
+  private held = 0;
+  private over = false;
+  private talking = false;
+  private started = false; // clock starts only after the opening prompt
+
+  constructor() {
+    super("Game");
+  }
+
+  create() {
+    this.over = false;
+    this.talking = false;
+    this.started = false;
+    this.held = 0;
+    this.crowd = [];
+    this.cameras.main.setBackgroundColor(COLORS.ink);
+    const bill = BILLS[this.billIndex];
+
+    // --- Left column ---
+    this.speaker = new PortraitCard(this, 150, 185, portraitKey(1), 250, 6);
+
+    this.approval = new Meter(this, 22, 345, {
+      width: 258, height: 22, color: COLORS.approval, lowColor: COLORS.approvalLow,
+      lowThreshold: 0.25, label: "APPROVAL", max: TUNING.approvalMax,
+    });
+    this.approval.set(TUNING.approvalStart);
+
+    this.steam = new Meter(this, 22, 405, {
+      width: 258, height: 22, color: COLORS.steam, lowColor: COLORS.steamLow,
+      lowThreshold: 0.3, label: "STEAM", max: TUNING.steamMax,
+    });
+    this.steam.set(TUNING.steamStart);
+
+    this.progress = new Meter(this, 22, 462, {
+      width: 258, height: 14, color: COLORS.gold, label: `HOLD THE FLOOR (${bill.holdSeconds}s)`, max: bill.holdSeconds,
+    });
+    this.progress.set(0);
+
+    for (let i = 0; i < 6; i++) {
+      const x = 70 + (i % 3) * 80;
+      const y = 545 + Math.floor(i / 3) * 80;
+      const key = portraitKey(((i * 3 + 2) % PORTRAIT_COUNT) + 1);
+      this.crowd.push(new PortraitCard(this, x, y, key, 72, 4).startIdle(i * 120));
+    }
+
+    // --- Right: the WALL OF TEXT ---
+    this.billText = this.add
+      .text(785, 18, `BILL ${bill.id} — ${bill.title}`, {
+        fontFamily: FONT, fontSize: "20px", color: CSS.gold, fontStyle: "bold",
+      })
+      .setOrigin(0.5, 0);
+
+    this.panel = new SpeechPanel(this, 308, 58, 952, 510);
+    this.panel.system("Take the floor — type your OPENING topic and press ENTER.\nThe clock starts when you do.");
+
+    this.ruling = this.add
+      .text(308, 582, "", { fontFamily: FONT, fontSize: "16px", color: CSS.muted })
+      .setOrigin(0, 0);
+
+    this.promptBox = new PromptInput(this, 308, 620, 952, (text) => this.feedTopic(text));
+    this.promptBox.setEnabled(true);
+
+    // --- Network (fresh per run) ---
+    this.net = new NetClient().connect();
+    const off = this.net.onMessage((m) => this.onServer(m));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      off();
+      this.net.close();
+    });
+  }
+
+  private feedTopic(text: string) {
+    if (this.over) return;
+    if (!this.started) {
+      this.started = true; // opening prompt -> clock begins (see update)
+      this.panel.begin();
+    }
+    this.ruling.setColor(CSS.muted).setText(`weighing “${text}”…`);
+    this.net.send({ type: "feed", prompt: text });
+  }
+
+  private onServer(m: ServerMessage) {
+    if (this.over) return;
+    switch (m.type) {
+      case "ready":
+        this.promptBox.setEnabled(true);
+        break;
+      case "judge":
+        this.applyJudge(m);
+        break;
+      case "speech_start":
+        this.talking = true;
+        this.panel.paragraphBreak(); // continue the wall, don't restart it
+        break;
+      case "speech":
+        this.panel.append(m.token);
+        this.steam.set(Math.min(TUNING.steamMax, this.steam.value + TUNING.steamRefillPerChunk));
+        break;
+      case "speech_end":
+        this.talking = false;
+        break;
+      case "error":
+        this.panel.system(`(the senator stammers) ${m.message}`);
+        this.talking = false;
+        break;
+    }
+  }
+
+  private applyJudge(m: Extract<ServerMessage, { type: "judge" }>) {
+    this.approval.set(this.approval.value + m.approvalDelta);
+    this.approval.flash();
+    const sign = m.approvalDelta >= 0 ? "+" : "";
+    this.ruling
+      .setColor(m.approvalDelta >= 0 ? CSS.gold : CSS.approval)
+      .setText(`${m.verdict.toUpperCase()}  ${sign}${m.approvalDelta} approval — ${m.reason}`);
+
+    const pool = CROWD_REACTIONS[m.verdict];
+    const negative = m.verdict === "flop";
+    this.crowd.forEach((c, i) =>
+      this.time.delayedCall(i * 60, () => {
+        if (!c.active) return;
+        c.react();
+        c.setMood(negative ? COLORS.approvalLow : COLORS.paper);
+        c.say(pool[Math.floor(Math.random() * pool.length)], !negative);
+      }),
+    );
+    this.speaker.react();
+  }
+
+  update(_t: number, dms: number) {
+    if (this.over || !this.started) return;
+    const dt = dms / 1000;
+    const bill = BILLS[this.billIndex];
+
+    this.steam.set(this.steam.value - TUNING.steamDrainPerSec * bill.steamDrainMult * dt);
+    this.approval.set(this.approval.value - bill.approvalDrainPerSec * dt);
+
+    this.held += dt;
+    this.progress.set(this.held);
+
+    if (this.steam.value <= 0) return this.end(false, "The senator ran out of steam.");
+    if (this.approval.value <= 0) return this.end(false, "Gaveled down — the floor turned on you.");
+    if (this.held >= bill.holdSeconds) {
+      if (this.billIndex >= BILLS.length - 1) {
+        return this.end(true, "Every bill talked to death. The session collapses!");
+      }
+      this.advanceBill();
+    }
+  }
+
+  private advanceBill() {
+    this.billIndex++;
+    const bill = BILLS[this.billIndex];
+    this.held = 0;
+    this.billText.setText(`BILL ${bill.id} — ${bill.title}`);
+    this.ruling.setColor(CSS.gold).setText(`Bill killed! Next up: ${bill.title}`);
+    this.approval.set(Math.min(TUNING.approvalMax, this.approval.value + 15));
+    this.steam.set(Math.min(TUNING.steamMax, this.steam.value + 20));
+    this.progress.set(0);
+  }
+
+  private end(won: boolean, reason: string) {
+    this.over = true;
+    this.promptBox.setEnabled(false);
+    this.net.send({ type: "reset" });
+    const billsKilled = this.billIndex + (won ? 1 : 0);
+    this.billIndex = 0;
+    this.scene.start("End", { won, reason, billsKilled });
+  }
+}

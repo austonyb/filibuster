@@ -11,11 +11,16 @@ export interface GenerateOptions {
   numPredict?: number;
   stop?: string[];
   signal?: AbortSignal;
+  // Continuation: ollama's token context from a prior call. Passing it makes the
+  // model CONTINUE rather than start over. onDone receives the new context.
+  context?: number[];
+  onDone?: (context: number[] | undefined) => void;
 }
 
 interface OllamaChunk {
   response?: string;
   done?: boolean;
+  context?: number[];
 }
 
 function body(prompt: string, opts: GenerateOptions, stream: boolean) {
@@ -24,9 +29,15 @@ function body(prompt: string, opts: GenerateOptions, stream: boolean) {
     prompt,
     system: opts.system,
     stream,
+    ...(opts.context ? { context: opts.context } : {}),
     options: {
       temperature: opts.temperature ?? 0.9,
       num_predict: opts.numPredict ?? 96,
+      // Push variety / suppress the verbatim-restart problem on the tiny model.
+      top_p: 0.95,
+      top_k: 64,
+      repeat_penalty: 1.4,
+      repeat_last_n: 256,
       ...(opts.stop ? { stop: opts.stop } : {}),
     },
   });
@@ -66,7 +77,10 @@ export async function* generateStream(
         continue;
       }
       if (obj.response) yield obj.response;
-      if (obj.done) return;
+      if (obj.done) {
+        opts.onDone?.(obj.context);
+        return;
+      }
     }
   }
 }

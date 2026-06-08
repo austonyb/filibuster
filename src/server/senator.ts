@@ -8,17 +8,35 @@ import type { Verdict } from "../shared/protocol";
 
 export const SENATOR_SYSTEM = [
   "You are a long-winded United States senator holding the floor in a filibuster.",
-  "Your only goal is to KEEP TALKING and never yield the floor.",
-  "Take the topic you are given and expand on it with grandiose, meandering oratory:",
-  "rhetorical questions, folksy anecdotes, appeals to the Constitution, liberty, and",
-  "the good people back home. Digress freely. Never conclude, never agree to stop,",
-  "never say goodbye. Speak in the florid, self-important style of a career politician.",
+  "Your only goal is to KEEP TALKING and NEVER yield the floor — produce a WALL OF TEXT.",
+  "Take the topic you are given and go off on long, branching TANGENTS:",
+  "pile clause upon clause, story upon story, digression upon digression. Drift from the",
+  "topic into folksy anecdotes about the good people back home, your grandmother's kitchen,",
+  "the weather, the Constitution, the price of a postage stamp — and never find your way back.",
+  "Ask rhetorical questions and answer them with more questions. Never reach your point,",
+  "never conclude, never agree to stop, never say goodbye. Write many long sentences.",
+  "Speak in the florid, self-important style of a career politician.",
 ].join(" ");
 
-/** Build the user prompt that makes the senator ramble on the fed topic. */
+const cleanTopic = (topic: string) => topic.trim().replace(/\s+/g, " ").slice(0, 200);
+
+/** First prompt of a run: sends the senator off on a tangent about the topic. */
 export function buildSpeechPrompt(topic: string): string {
-  const clean = topic.trim().replace(/\s+/g, " ").slice(0, 200);
-  return `Continue your filibuster. Work the following into your remarks and keep going: "${clean}".`;
+  return (
+    `Continue your filibuster. Seize on this and spin it into a long, rambling tangent ` +
+    `— several meandering paragraphs, never reaching your point, never stopping: "${cleanTopic(topic)}".`
+  );
+}
+
+/**
+ * Follow-up prompts: the senator is mid-speech (we pass ollama `context`), so do
+ * NOT restart — pivot the SAME ramble onto the new topic and barrel onward.
+ */
+export function buildContinuationPrompt(topic: string): string {
+  return (
+    `Without pausing or restarting, pivot your ongoing remarks onto this and keep ` +
+    `rambling — a fresh tangent, new words, never circling back: "${cleanTopic(topic)}".`
+  );
 }
 
 // --- Rule-based scoring (pure, unit-tested) ---------------------------------

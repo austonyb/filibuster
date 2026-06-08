@@ -55,5 +55,29 @@
 ### Next up
 - Phase 3: Phaser scenes (Boot/Preload/Menu/Game/Win/GameOver) + senate-floor layout (speaker + crowd cards).
 
+## Session 1 — Phase 3 + playtest fixes — COMPLETE (Phase 4 networking pulled in)
+- Scenes: Boot (preload), Menu, Game (senate floor), End. Registered in main.ts.
+- UI components: PortraitCard (cream cards + say() canned bubbles), Meter, SpeechPanel (scrolling wall,
+  front-trim since Phaser4 dropped WebGL masks), PromptInput (canvas keyboard capture).
+- Wall-of-text pivot: large scrolling speech panel is the hero; speaker+meters+crowd in left column.
+- Wired live WS into GameScene (NetClient): feed -> judge ruling + crowd heckles -> streamed wall.
+- Playtest fixes round 1:
+  * Continuous speech via ollama `context` (no restart/verbatim); +creativity opts (repeat_penalty/top_p/top_k).
+  * Opening prompt starts the clock (started flag; update() idles until first feed).
+  * Crowd speech bubbles with canned reactions by verdict (CROWD_REACTIONS pools).
+  * FIXED new-game-input-ignored: field `this.input` shadowed Phaser `scene.input`; renamed to `promptBox`.
+  * Switched dev server to `bun --hot` (server hot-reload; no manual restarts).
+- Verified in-browser (r_bubbles.png): feed, LANDED +9 ruling, crowd "Hear hear!/Bravo!/Tell em!", streaming
+  wall, meters. Continuation verified via WS (/tmp/ws_cont.ts).
+- Tooling note: agent-browser `press <letter>`/`keyboard type` don't reach window keydown + sometimes spawn an
+  about:blank tab (blank screenshots). Drive Phaser input via `eval` dispatching KeyboardEvent (incl keyCode for Enter).
+
+### To verify with user (couldn't auto-capture restart cleanly due to about:blank tooling)
+- New-game input now works after the `promptBox` rename (high confidence by root-cause).
+
+### Known follow-ups (Phase 5/6)
+- Balance: one good prompt currently sustains a long time (steam refill generous). Tune drain/refill.
+- Senator sometimes drifts to 3rd-person narration ("Senator Johnson…") on continuation — refine persona if desired.
+
 ### Awaiting from user
 - GothicVania town files (optional background) — drop into `assets/` if desired.

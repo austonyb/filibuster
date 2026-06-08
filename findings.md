@@ -47,8 +47,28 @@ flavor/hecklers later. GothicVania town pack mentioned by user but NOT on disk y
   - Future option if still noisy: drop the LLM judge entirely, or use `qwen3.5:2b` for judging only.
 - Speech quality at num_predict=90 (~400 chars) is genuinely good filibuster oratory. Streams smoothly.
 - Note: `chunkCount` from streaming != exact ollama token count (it's NDJSON chunk count). Fine for gameplay.
-- Backend modules do NOT hot-reload under plain `bun ./index.ts` (only `Bun.serve` frontend HMR does).
-  Restart the server after editing `src/server/*` or `index.ts`. (`bun --hot ./index.ts` reloads server too.)
+- DEV WORKFLOW (corrected): run **`bun run dev`** = `bun --hot ./index.ts`. Two reload paths, both then work:
+  - frontend HMR (browser) via `Bun.serve({ development: { hmr: true } })`;
+  - server-side hot reload of `index.ts` + `src/server/*` via the `--hot` flag (no port conflict, no manual restart).
+  Earlier I ran plain `bun ./index.ts` (no --hot) and was manually killing/restarting — unnecessary. Don't do that.
+
+## DESIGN PIVOT (user, 2026-06-07): WALLS OF TEXT
+- The senator should produce a WALL OF TEXT. The player's prompt leads the senator off on a
+  long tangent; gemma3 rambles at length and the screen fills with words.
+- Implications:
+  - Generation length raised (num_predict ~400+) and prompt/persona pushed toward long tangents.
+  - Speech display = a big SCROLLING text panel (accumulates + auto-scrolls), not a small trimmed bubble.
+  - Pulled Phase 4 networking forward so the real gemma3 stream shows the wall (stub only echoed a line).
+  - Layout reworked: wall of text is the hero (large right panel); speaker+crowd+meters in a left column.
+
+## Playtest feedback round 1 (user, 2026-06-07)
+1. Senator RESTARTS each prompt with near-verbatim openings (270m not creative). FIX: continuous
+   generation — pass ollama `context` token array back so it CONTINUES; append paragraphs (don't clear);
+   add repeat_penalty/top_p/top_k + higher temp to reduce verbatim repetition. Judge only needs the
+   latest text/prompt.
+2. BUG: starting a new game without reloading -> input ignored. Scene-restart lifecycle (keyboard rebind).
+3. Let the player type the OPENING prompt; clock/drain starts only after the first feed.
+4. Crowd senators get speech bubbles: canned reactions pulled by verdict ("Hear, hear!", "Nope!", etc).
 
 ## Risks / things to watch
 - 270m model coherence + judging reliability is the #1 risk -> build rule-based scoring fallback and

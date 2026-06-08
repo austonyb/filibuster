@@ -69,6 +69,8 @@ test("verdicts map sensibly", () => {
 test("buildSpeechPrompt embeds and clamps the topic", () => {
   const p = buildSpeechPrompt("  the  weather   back home ");
   expect(p).toContain("the weather back home");
+  // Topic is clamped to 200 chars before being wrapped in the instruction.
   const long = buildSpeechPrompt("x".repeat(500));
-  expect(long.length).toBeLessThan(300);
+  expect(long).not.toContain("x".repeat(201));
+  expect(long).toContain("x".repeat(200));
 });
