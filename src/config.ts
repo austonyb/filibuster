@@ -39,9 +39,9 @@ export const portraitPath = (n: number) =>
 // (steamBonus, server-side) when a speech lands. Good topics = breathing room.
 export const TUNING = {
   steamMax: 100,
-  steamStart: 75,
-  steamDrainPerSec: 8, // idle drain (scaled per bill)
-  talkDrainMult: 0.35, // drain multiplier while the senator is streaming
+  steamStart: 80,
+  steamDrainPerSec: 3.5, // idle drain (scaled per bill) — slow enough to type a prompt
+  talkDrainMult: 0.3, // drain multiplier while the senator is streaming (nearly paused)
   approvalStart: 55,
   approvalMax: 100,
   crowdSize: 7,

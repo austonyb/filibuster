@@ -92,6 +92,12 @@
 - Verified live (ws_judge.ts): rich->LANDED +9/+33, "ok"->WEAK, drift+rehash->WEAK +0. In-browser confirmed.
 - --hot caveat learned: server-logic module edits (src/server/*) need a restart; frontend HMR is fine.
 
+## Session 1 — drain too fast to type (user)
+- Slowed idle STEAM drain 8 -> 3.5/s (talkDrainMult 0.35 -> 0.3, near-paused while talking); steamStart 80.
+- Measured live ~3.7/s idle -> ~20-27s to type a prompt from a healthy level. Much more humane.
+- Added window.__game debug handle in main.ts (dev: read scenes/meters from console; used to measure drain).
+
 ### Awaiting from user
-- Playtest the new judging/difficulty and tell me too-hard/too-easy + feel. Knobs in config.ts TUNING + BILLS.
+- Playtest: is the drain comfortable now? Want it even slower (drop steamDrainPerSec ~2.5)? Knobs in config.ts TUNING.
+- Overall difficulty feel (too-hard/too-easy). Knobs in config.ts TUNING + BILLS.
 - GothicVania town files (optional background) — drop into `assets/` if desired.

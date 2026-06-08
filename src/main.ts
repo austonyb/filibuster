@@ -18,4 +18,7 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [BootScene, MenuScene, GameScene, EndScene],
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+// Debug handle (dev only) — inspect scenes/meters from the console.
+(globalThis as unknown as { __game: Phaser.Game }).__game = game;
