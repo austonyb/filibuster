@@ -48,7 +48,7 @@ LLM: **ollama** running `gemma3:270m` locally (API reachable on `localhost:11434
 | 3 | Phaser scenes + senate-floor layout (Boot/Preload/Menu/Game/Win/GameOver, load assets) | complete |
 | 4 | Gameplay systems (STEAM + APPROVAL meters, bill progress, input box, wire WS, lose/win logic) | mostly done (pulled into P3) |
 | 5 | Feel + polish (crowd reactions, streaming bubble anim, hecklers, woodcut styling, bill escalation) | pending |
-| 6 | Testing + balance (bun test for judge/meter math, playtest, tune gemma3 prompts/difficulty) | pending |
+| 6 | Testing + balance (bun test for judge/meter math, playtest, tune gemma3 prompts/difficulty) | in_progress |
 
 ## Decisions
 - Talk to ollama via its native HTTP API (`/api/generate` with `stream:true`) from the Bun backend;

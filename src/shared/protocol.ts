@@ -13,9 +13,10 @@ export type ClientMessage =
 export type ServerMessage =
   | { type: "ready" } // socket open, model warmed
   | {
-      type: "judge"; // result of scoring the player's prompt
-      score: number; // 0..10 blended score
+      type: "judge"; // result of scoring the senator's OUTPUT (sent after the speech)
+      score: number; // 0..10
       approvalDelta: number; // signed change to apply to the APPROVAL meter
+      steamBonus: number; // STEAM awarded for how well the speech landed
       verdict: Verdict;
       reason: string; // short human-readable rationale
     }

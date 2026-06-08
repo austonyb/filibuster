@@ -111,7 +111,7 @@ export class GameScene extends Phaser.Scene {
       this.started = true; // opening prompt -> clock begins (see update)
       this.panel.begin();
     }
-    this.ruling.setColor(CSS.muted).setText(`weighing “${text}”…`);
+    this.ruling.setColor(CSS.muted).setText(`the senator takes up “${text}”…`);
     this.net.send({ type: "feed", prompt: text });
   }
 
@@ -130,7 +130,6 @@ export class GameScene extends Phaser.Scene {
         break;
       case "speech":
         this.panel.append(m.token);
-        this.steam.set(Math.min(TUNING.steamMax, this.steam.value + TUNING.steamRefillPerChunk));
         break;
       case "speech_end":
         this.talking = false;
@@ -145,10 +144,13 @@ export class GameScene extends Phaser.Scene {
   private applyJudge(m: Extract<ServerMessage, { type: "judge" }>) {
     this.approval.set(this.approval.value + m.approvalDelta);
     this.approval.flash();
+    // Steam reward scales with how well the speech landed.
+    this.steam.set(Math.min(TUNING.steamMax, this.steam.value + m.steamBonus));
+    this.steam.flash();
     const sign = m.approvalDelta >= 0 ? "+" : "";
     this.ruling
       .setColor(m.approvalDelta >= 0 ? CSS.gold : CSS.approval)
-      .setText(`${m.verdict.toUpperCase()}  ${sign}${m.approvalDelta} approval — ${m.reason}`);
+      .setText(`${m.verdict.toUpperCase()}  ${sign}${m.approvalDelta} approval  +${m.steamBonus} steam — ${m.reason}`);
 
     const pool = CROWD_REACTIONS[m.verdict];
     const negative = m.verdict === "flop";
@@ -168,7 +170,9 @@ export class GameScene extends Phaser.Scene {
     const dt = dms / 1000;
     const bill = BILLS[this.billIndex];
 
-    this.steam.set(this.steam.value - TUNING.steamDrainPerSec * bill.steamDrainMult * dt);
+    // Steam drains gently while the senator holds forth, fast while you're idle.
+    const drainMult = this.talking ? TUNING.talkDrainMult : 1;
+    this.steam.set(this.steam.value - TUNING.steamDrainPerSec * bill.steamDrainMult * drainMult * dt);
     this.approval.set(this.approval.value - bill.approvalDrainPerSec * dt);
 
     this.held += dt;

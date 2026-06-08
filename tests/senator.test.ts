@@ -1,11 +1,21 @@
 import { test, expect } from "bun:test";
 import {
   ruleScore,
-  combineScore,
   approvalDelta,
   verdictFor,
   buildSpeechPrompt,
+  scoreOutput,
+  steamBonus,
+  judge,
 } from "../src/server/senator";
+
+// A long, varied, on-topic ramble for output-judging tests.
+const GOOD_OUTPUT =
+  "My friends, the postage stamp! That humble square of gummed paper carries within it " +
+  "the entire weight of our republic, from the founding farmers to the quiet clerks who " +
+  "sort our letters by lamplight, and I say to you that no committee, no clever amendment, " +
+  "no procedural trick shall ever diminish the dignity of the postage stamp in this chamber, " +
+  "for it binds the prairie to the seaport and the grandmother to her distant grandson.";
 
 test("empty prompt scores zero", () => {
   expect(ruleScore("").score).toBe(0);
@@ -44,13 +54,6 @@ test("scores clamp to 0..10", () => {
   expect(ruleScore("um uh ok bye no nothing").score).toBeGreaterThanOrEqual(0);
 });
 
-test("combineScore: rules dominate, falls back to rule when LLM missing", () => {
-  expect(combineScore(6, null)).toBe(6);
-  expect(combineScore(9, 0)).toBe(7); // round(9*.75 + 0) -> good prompt survives a bad LLM rating
-  expect(combineScore(10, 0)).toBe(8); // round(7.5)
-  expect(combineScore(0, 10)).toBe(3); // round(2.5) -> LLM only nudges
-});
-
 test("approvalDelta: low scores hurt, high scores help, neutral ~ 0", () => {
   expect(approvalDelta(0)).toBeLessThan(0);
   expect(approvalDelta(4)).toBe(0);
@@ -73,4 +76,50 @@ test("buildSpeechPrompt embeds and clamps the topic", () => {
   const long = buildSpeechPrompt("x".repeat(500));
   expect(long).not.toContain("x".repeat(201));
   expect(long).toContain("x".repeat(200));
+});
+
+// --- Output-based judging (the real judge) ---
+
+test("a short fizzle scores zero", () => {
+  expect(scoreOutput("the constitution", "Well, I...").score).toBe(0);
+});
+
+test("a long varied on-topic ramble lands", () => {
+  const r = scoreOutput("the postage stamp", GOOD_OUTPUT);
+  expect(r.score).toBeGreaterThanOrEqual(7);
+  expect(verdictFor(r.score)).toBe("landed");
+});
+
+test("a repetitive ramble is penalized vs a varied one", () => {
+  const loop = ("freedom ").repeat(60);
+  const varied = scoreOutput("freedom", GOOD_OUTPUT).score;
+  expect(scoreOutput("freedom", loop).score).toBeLessThan(varied);
+});
+
+test("ignoring the topic scores lower than addressing it", () => {
+  const offTopic =
+    "Banana banana orchard orchard sailing ships beneath the moon and the tide " +
+    "rolls gently across forgotten harbors while gulls wheel overhead in silence indeed.";
+  const on = scoreOutput("the postage stamp", GOOD_OUTPUT).score;
+  const off = scoreOutput("the postage stamp", offTopic).score;
+  expect(off).toBeLessThan(on);
+});
+
+test("rehashing a recent output is penalized", () => {
+  const fresh = scoreOutput("the postage stamp", GOOD_OUTPUT, []).score;
+  const rehash = scoreOutput("the postage stamp", GOOD_OUTPUT, [GOOD_OUTPUT]).score;
+  expect(rehash).toBeLessThan(fresh);
+});
+
+test("steamBonus rises with score and is always positive", () => {
+  expect(steamBonus(0)).toBeGreaterThan(0);
+  expect(steamBonus(10)).toBeGreaterThan(steamBonus(0));
+});
+
+test("judge returns a full verdict over the output", () => {
+  const j = judge("the postage stamp", GOOD_OUTPUT, []);
+  expect(j.verdict).toBe("landed");
+  expect(j.approvalDelta).toBeGreaterThan(0);
+  expect(j.steamBonus).toBeGreaterThan(0);
+  expect(typeof j.reason).toBe("string");
 });

@@ -34,12 +34,14 @@ export const portraitPath = (n: number) =>
   `/assets/strangers/portrait_${String(n).padStart(2, "0")}.png`;
 
 // --- Gameplay tuning --------------------------------------------------------
+// STEAM model: drains fast while you're idle (feed another topic!), drains
+// gently while the senator is talking, and is refilled by a quality bonus
+// (steamBonus, server-side) when a speech lands. Good topics = breathing room.
 export const TUNING = {
   steamMax: 100,
-  steamStart: 70,
-  steamDrainPerSec: 9, // base drain while talking
-  // When the senator is actively streaming speech, steam holds/recovers a bit.
-  steamRefillPerChunk: 0.6,
+  steamStart: 75,
+  steamDrainPerSec: 8, // idle drain (scaled per bill)
+  talkDrainMult: 0.35, // drain multiplier while the senator is streaming
   approvalStart: 55,
   approvalMax: 100,
   crowdSize: 7,

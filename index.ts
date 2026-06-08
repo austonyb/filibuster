@@ -32,15 +32,8 @@ async function handleFeed(ws: ServerWebSocket<WSData>, prompt: string) {
   ws.data.abort = abort;
 
   try {
-    // 1. Judge the prompt -> approval delta (rules + LLM).
-    const j = await judge(prompt, ws.data.recent, abort.signal);
-    send(ws, { type: "judge", ...j });
-
-    ws.data.recent.push(prompt);
-    if (ws.data.recent.length > 6) ws.data.recent.shift();
-
-    // 2. Stream the senator's continued ramble. If we have prior context, the
-    //    model CONTINUES the same speech; otherwise it's the opening salvo.
+    // 1. Stream the senator's ramble. If we have prior context the model
+    //    CONTINUES the same speech; otherwise it's the opening salvo.
     send(ws, { type: "speech_start" });
     let full = "";
     let chunkCount = 0;
@@ -54,7 +47,7 @@ async function handleFeed(ws: ServerWebSocket<WSData>, prompt: string) {
         onDone: (ctx) => {
           if (ctx) ws.data.context = ctx;
         },
-        numPredict: 260, // a meaty paragraph per turn; the wall accrues over turns
+        numPredict: 220, // a meaty paragraph per turn; the wall accrues over turns
         temperature: 1.1,
         signal: abort.signal,
       },
@@ -64,6 +57,12 @@ async function handleFeed(ws: ServerWebSocket<WSData>, prompt: string) {
       send(ws, { type: "speech", token: tok });
     }
     send(ws, { type: "speech_end", text: full, chunkCount });
+
+    // 2. Judge the OUTPUT (what your prompt actually produced) -> approval + steam.
+    const j = judge(prompt, full, ws.data.recent);
+    send(ws, { type: "judge", ...j });
+    ws.data.recent.push(full);
+    if (ws.data.recent.length > 4) ws.data.recent.shift();
   } catch (err) {
     if (!abort.signal.aborted) {
       send(ws, { type: "error", message: err instanceof Error ? err.message : String(err) });

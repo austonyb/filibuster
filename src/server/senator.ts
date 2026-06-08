@@ -3,7 +3,6 @@
 // rules (always available, keeps the game fair when the 270m model wobbles)
 // blended with an optional LLM rating.
 
-import { generateOnce } from "./ollama";
 import type { Verdict } from "../shared/protocol";
 
 export const SENATOR_SYSTEM = [
@@ -22,9 +21,11 @@ const cleanTopic = (topic: string) => topic.trim().replace(/\s+/g, " ").slice(0,
 
 /** First prompt of a run: sends the senator off on a tangent about the topic. */
 export function buildSpeechPrompt(topic: string): string {
+  const t = cleanTopic(topic);
   return (
-    `Continue your filibuster. Seize on this and spin it into a long, rambling tangent ` +
-    `— several meandering paragraphs, never reaching your point, never stopping: "${cleanTopic(topic)}".`
+    `Continue your filibuster on the subject of "${t}". Name "${t}" explicitly and keep ` +
+    `returning to it as you spin a long, rambling tangent — several meandering paragraphs, ` +
+    `never reaching your point, never stopping.`
   );
 }
 
@@ -33,9 +34,10 @@ export function buildSpeechPrompt(topic: string): string {
  * NOT restart — pivot the SAME ramble onto the new topic and barrel onward.
  */
 export function buildContinuationPrompt(topic: string): string {
+  const t = cleanTopic(topic);
   return (
-    `Without pausing or restarting, pivot your ongoing remarks onto this and keep ` +
-    `rambling — a fresh tangent, new words, never circling back: "${cleanTopic(topic)}".`
+    `Without pausing or restarting, pivot your ongoing remarks onto "${t}". Work the words ` +
+    `"${t}" in by name and keep coming back to them as you ramble on with fresh material.`
   );
 }
 
@@ -116,34 +118,69 @@ export function ruleScore(prompt: string, recent: string[] = []): RuleResult {
   return { score, reason: reasons.join(", ") || "serviceable" };
 }
 
-/** Ask the LLM to rate the prompt 0..10. Returns null on failure/garbage. */
-export async function llmScore(
-  prompt: string,
-  signal?: AbortSignal,
-): Promise<number | null> {
-  try {
-    const out = await generateOnce(
-      `On a scale of 0 to 10, how good is this topic as endless fuel for a filibuster ` +
-        `(10 = you could talk about it forever, 0 = a conversational dead end)? ` +
-        `Topic: "${prompt}". Answer with ONLY a single integer 0 to 10.`,
-      { numPredict: 4, temperature: 0, signal },
-    );
-    const m = out.match(/\d+/);
-    if (!m) return null;
-    return Math.max(0, Math.min(10, parseInt(m[0], 10)));
-  } catch {
-    return null;
-  }
-}
+// Stopwords so topicality looks at the meaningful words you fed.
+const STOP = new Set([
+  "the", "and", "but", "for", "with", "that", "this", "these", "those", "from",
+  "your", "our", "are", "was", "were", "its", "it's", "you", "they", "them",
+  "what", "when", "will", "would", "could", "should", "have", "has", "had",
+  "about", "into", "over", "than", "then", "their", "there",
+]);
+const contentWords = (s: string) => wordsOf(s).filter((w) => w.length >= 4 && !STOP.has(w));
 
 /**
- * Blend the deterministic rule score with the optional LLM score (0..10).
- * Rules dominate: gemma3:270m is a fine *talker* but an unreliable *judge*
- * (it rates obviously-good filibuster bait near 0), so the LLM only nudges.
+ * Score the senator's OUTPUT (the speech your prompt produced) 0..10. This is
+ * the real judge: did your topic spin into sustained, fresh, on-topic oratory?
+ *   length (0..4)  +  non-repetition (0..3)  +  topicality (0..3)
+ * minus penalties for rehashing earlier remarks or being handed pure filler.
  */
-export function combineScore(rule: number, llm: number | null): number {
-  if (llm == null) return rule;
-  return Math.round(rule * 0.75 + llm * 0.25);
+export function scoreOutput(
+  prompt: string,
+  output: string,
+  recentOutputs: string[] = [],
+): RuleResult {
+  const out = wordsOf(output);
+  const n = out.length;
+  if (n < 6) return { score: 0, reason: "the senator fizzled out" };
+
+  const lengthScore = Math.min(4, (n / 80) * 4); // ~80+ words = full marks
+  const uniqRatio = new Set(out).size / n;
+  const repScore = Math.min(3, uniqRatio * 4.5); // looping output tanks this
+
+  const topics = contentWords(prompt);
+  const lowerOut = output.toLowerCase();
+  const hits = topics.filter((t) => lowerOut.includes(t)).length;
+  const topicScore = topics.length === 0 ? 0.5 : Math.min(3, hits * 1.6);
+
+  let score = lengthScore + repScore + topicScore;
+  const faults: string[] = [];
+  if (lengthScore < 2) faults.push("ran short");
+  if (repScore < 1.5) faults.push("kept repeating");
+  if (topics.length > 0 && topicScore < 1) faults.push("drifted off your topic");
+
+  // Senator parroting an earlier ramble.
+  if (recentOutputs.some((r) => jaccard(wordsOf(r), out) >= 0.55)) {
+    score -= 3;
+    faults.push("rehashing earlier remarks");
+  }
+  // You handed them nothing to work with.
+  const pw = wordsOf(prompt);
+  if (pw.length > 0 && pw.every((w) => FILLER.has(w))) {
+    score -= 2;
+    faults.push("you gave them nothing");
+  }
+
+  score = Math.max(0, Math.min(10, Math.round(score)));
+
+  // Reason should match the verdict: praise when it lands, fault when it doesn't.
+  let reason: string;
+  if (score >= 7) {
+    reason = topicScore >= 2 ? "worked your topic masterfully" : "a rousing tangent";
+  } else if (faults.length > 0) {
+    reason = faults.slice(0, 2).join(", ");
+  } else {
+    reason = "serviceable";
+  }
+  return { score, reason };
 }
 
 /** Map a 0..10 score to a signed APPROVAL delta. 4 is roughly neutral. */
@@ -165,22 +202,25 @@ export interface Judgement {
   approvalDelta: number;
   verdict: Verdict;
   reason: string;
+  steamBonus: number; // STEAM awarded for how well it landed
 }
 
-/** Full judging pipeline: rules + LLM blended into a final verdict. */
-export async function judge(
-  prompt: string,
-  recent: string[],
-  signal?: AbortSignal,
-): Promise<Judgement> {
-  const rule = ruleScore(prompt, recent);
-  // Hard dead-ends skip the LLM call entirely.
-  const llm = rule.score === 0 ? null : await llmScore(prompt, signal);
-  const score = combineScore(rule.score, llm);
+/** Steam earned by the speech: a poor ramble barely refuels, a great one a lot. */
+export function steamBonus(score: number): number {
+  return Math.round(TUNING_STEAM_BONUS_BASE + Math.max(0, score) * TUNING_STEAM_BONUS_PER);
+}
+// Kept here (not config) so the pure judge stays dependency-free for tests.
+const TUNING_STEAM_BONUS_BASE = 8;
+const TUNING_STEAM_BONUS_PER = 3.5;
+
+/** Judge the senator's OUTPUT into a full verdict (approval + steam). */
+export function judge(prompt: string, output: string, recentOutputs: string[] = []): Judgement {
+  const r = scoreOutput(prompt, output, recentOutputs);
   return {
-    score,
-    approvalDelta: approvalDelta(score),
-    verdict: verdictFor(score),
-    reason: rule.reason,
+    score: r.score,
+    approvalDelta: approvalDelta(r.score),
+    verdict: verdictFor(r.score),
+    reason: r.reason,
+    steamBonus: steamBonus(r.score),
   };
 }

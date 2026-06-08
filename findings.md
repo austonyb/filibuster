@@ -70,6 +70,23 @@ flavor/hecklers later. GothicVania town pack mentioned by user but NOT on disk y
 3. Let the player type the OPENING prompt; clock/drain starts only after the first feed.
 4. Crowd senators get speech bubbles: canned reactions pulled by verdict ("Hear, hear!", "Nope!", etc).
 
+## Playtest feedback round 2 (user, 2026-06-07): judge the OUTPUT + tune
+- KEY DESIGN CHANGE: the judge now scores the senator's OUTPUT (the speech your prompt produced),
+  not the prompt text. `scoreOutput(prompt, output, recentOutputs)`: length(0..4) + non-repetition(0..3)
+  + topicality(0..3), minus penalties for rehashing earlier remarks / being handed pure filler.
+  Judge is sent AFTER speech_end; crowd reacts after the speech (they listen, then heckle).
+- STEAM is now quality-driven: `steamBonus(score)` refills proportional to how well the speech landed.
+  Steam drains fast while idle, gently while the senator talks (TUNING.talkDrainMult). Good topics = air.
+- Verdict reasons now match the verdict (praise on landed, faults on weak/flop).
+- Topic-weaving: speech/continuation prompts now tell the senator to NAME and return to the topic, so
+  topicality is a meaningful (if still noisy on 270m) signal and steering feels responsive.
+- Removed the LLM prompt-judge (llmScore/combineScore) — output rules are a better, faster signal.
+- TUNING KNOBS: `src/config.ts` TUNING (steam drain/start, talkDrainMult) + BILLS (per-bill drain/hold);
+  steam bonus curve = TUNING_STEAM_BONUS_BASE/PER in senator.ts; approvalDelta() curve in senator.ts.
+- `--hot` CAVEAT (corrected again): observed that editing a deeply-imported SERVER module (src/server/senator.ts)
+  did NOT hot-swap in the live WS path — needed a restart. Frontend + index.ts hot-reload fine. So: for
+  src/server/* logic changes, restart the server to be sure; for UI/scene/frontend changes, HMR is fine.
+
 ## Risks / things to watch
 - 270m model coherence + judging reliability is the #1 risk -> build rule-based scoring fallback and
   keep prompts tightly constrained. Consider few-shot examples in the system prompt.

@@ -79,5 +79,19 @@
 - Balance: one good prompt currently sustains a long time (steam refill generous). Tune drain/refill.
 - Senator sometimes drifts to 3rd-person narration ("Senator Johnson…") on continuation — refine persona if desired.
 
+## Session 1 — Phase 6 start: output judging + tuning
+- Per user: judge the senator's OUTPUT, not the prompt. Rewrote senator.ts:
+  scoreOutput(length+non-repetition+topicality, penalties for rehash/filler); judge() now over output.
+  Removed llmScore/combineScore. Added steamBonus(score). Reasons match verdict.
+- index.ts: stream speech first, then judge output; push outputs (not prompts) into recent for rehash detection.
+- protocol: judge msg gains steamBonus.
+- config TUNING: steam model (idle drain 8, talkDrainMult 0.35, start 75); GameScene applies steamBonus + flash,
+  talking-aware drain; ruling shows "+N steam".
+- Topic-weaving prompts so the senator names/returns to the topic (responsive + topicality signal).
+- Tests: 16 pass (added scoreOutput/steamBonus/judge-over-output cases; removed combineScore test).
+- Verified live (ws_judge.ts): rich->LANDED +9/+33, "ok"->WEAK, drift+rehash->WEAK +0. In-browser confirmed.
+- --hot caveat learned: server-logic module edits (src/server/*) need a restart; frontend HMR is fine.
+
 ### Awaiting from user
+- Playtest the new judging/difficulty and tell me too-hard/too-easy + feel. Knobs in config.ts TUNING + BILLS.
 - GothicVania town files (optional background) — drop into `assets/` if desired.
