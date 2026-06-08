@@ -124,6 +124,12 @@
 - LESSON: dev with `bun run dev` (--hot) — plain `bun` served a stale frontend bundle.
 - Tests 16 pass.
 
+## Session 1 — difficulty changeable on retry screen (user)
+- Extracted slider to reusable src/ui/DifficultySlider.ts (returns its objects). MenuScene + EndScene both use it.
+- EndScene: slider sits between transcript and restart; its objects added to the transcript-camera ignore list.
+- Verified: change tier on End -> registry updates -> rematch (ENTER) starts in the new tier (ROWDY start=52).
+- Tests 16 pass.
+
 ### Awaiting from user
 - Playtest the tiers — is the spread good (GENTLE→BEDLAM)? Any tier feel off?
 - Pace okay (~9s/turn on qwen)? Junk prompts still earn weak-positive — punish harder or leave it?
