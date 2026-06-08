@@ -115,6 +115,22 @@ flavor/hecklers later. GothicVania town pack mentioned by user but NOT on disk y
   The wall streams in token-by-token (watchable/readable) and accrues across turns. Knob: numPredict in index.ts.
 - Updated on-screen credit + CREDITS.md to qwen3.5:2b.
 
+## Difficulty slider (user, 2026-06-07): too easy + crowd too nice
+- Added DIFFICULTIES (config.ts), index 0 = GENTLE = original tuning (easiest) -> BEDLAM (hardest).
+  Levers: steamDrainMult, approvalDrainMult, approvalStart, rewardMult (scales + approval/steam gains),
+  penaltyMult (scales - approval), meanness (chance a crowd member heckles NEGATIVELY regardless of verdict).
+- Menu: ◀ NAME ▶ slider with 5 notches (red = hotter); ←/→ or click; stored in Phaser registry (DIFFICULTY_KEY).
+- GameScene reads registry, applies mults; HUD shows [TIER]; crowd meanness uses flop pool + red mood.
+- BALANCE BUG found+fixed: on hard tiers you were gaveled down in ~10s DURING the opening speech (qwen ~9s,
+  approval bled at full rate before the first judge). FIX: approval now drains * talkDrainMult while the
+  senator talks (chamber is captive), same as steam. Softened the hard-tier curve. BEDLAM now: survive the
+  opening, ~T3 you can kill bill 1 but it's white-knuckle. Hard-but-winnable.
+- OPERATIONAL LESSON (important): plain `bun ./index.ts` served a STALE frontend bundle — config edits
+  (BEDLAM start 44) didn't apply until I restarted with `bun --hot`. RULE: always dev with `bun run dev`
+  (= `bun --hot ./index.ts`); it rebundles the frontend on change. For src/server/* logic, restart if unsure.
+- Test-harness note: window helpers (__type etc.) are wiped on page reload; redefine them after every
+  `agent-browser open` or feeds silently no-op.
+
 ## Risks / things to watch
 - 270m model coherence + judging reliability is the #1 risk -> build rule-based scoring fallback and
   keep prompts tightly constrained. Consider few-shot examples in the system prompt.

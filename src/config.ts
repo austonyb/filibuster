@@ -68,3 +68,28 @@ export const BILLS: Bill[] = [
   { id: "S-0042", title: "The Mandatory Broccoli Act", holdSeconds: 45, steamDrainMult: 1.2, approvalDrainPerSec: 1.2 },
   { id: "HR-1138", title: "The Sentient Toaster Regulation Act", holdSeconds: 60, steamDrainMult: 1.4, approvalDrainPerSec: 1.6 },
 ];
+
+// --- Difficulty ------------------------------------------------------------
+// Index 0 is the easiest (= the original tuning). Harder tiers drain faster,
+// reward less, punish more, and make the gallery meaner (heckle negatively even
+// when the speech lands). Selected on the menu, stored in the Phaser registry.
+export interface Difficulty {
+  name: string;
+  desc: string;
+  steamDrainMult: number; // x idle steam drain
+  approvalDrainMult: number; // x heckler approval bleed
+  approvalStart: number; // starting approval
+  rewardMult: number; // x positive approval + steam bonus (lower = harder)
+  penaltyMult: number; // x negative approval delta (higher = harder)
+  meanness: number; // chance a crowd member heckles negatively regardless of verdict
+}
+
+export const DIFFICULTIES: Difficulty[] = [
+  { name: "GENTLE",  desc: "a sympathetic chamber",          steamDrainMult: 1.0, approvalDrainMult: 1.0, approvalStart: 60, rewardMult: 1.0,  penaltyMult: 1.0, meanness: 0.0 },
+  { name: "ORDERLY", desc: "polite, but watching the clock", steamDrainMult: 1.3, approvalDrainMult: 1.5, approvalStart: 56, rewardMult: 0.9,  penaltyMult: 1.25, meanness: 0.2 },
+  { name: "ROWDY",   desc: "the hecklers are warming up",    steamDrainMult: 1.6, approvalDrainMult: 2.0, approvalStart: 52, rewardMult: 0.8,  penaltyMult: 1.5, meanness: 0.4 },
+  { name: "UNRULY",  desc: "a hostile floor",               steamDrainMult: 2.0, approvalDrainMult: 2.6, approvalStart: 48, rewardMult: 0.7,  penaltyMult: 1.85, meanness: 0.6 },
+  { name: "BEDLAM",  desc: "open revolt — good luck",        steamDrainMult: 2.5, approvalDrainMult: 3.2, approvalStart: 44, rewardMult: 0.6,  penaltyMult: 2.2, meanness: 0.8 },
+];
+
+export const DIFFICULTY_KEY = "difficulty"; // Phaser registry key (stores the index)

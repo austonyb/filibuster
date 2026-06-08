@@ -115,8 +115,17 @@
 - Trimmed numPredict 220->160 (~9s/turn) since qwen is slower (~13s for 220). Updated credits to qwen.
 - Tests 16 pass.
 
+## Session 1 — difficulty slider + meaner crowd (user)
+- Added DIFFICULTIES (GENTLE..BEDLAM; index 0 = original = easiest). Menu slider (←/→/click), stored in registry.
+- GameScene applies per-tier mults (steam/approval drain, start, reward/penalty, crowd meanness); HUD shows tier.
+- "Too nice" fix: crowd `meanness` -> heckle with flop pool (negative) even on decent speeches at higher tiers.
+- Fixed hard-tier death-during-opening: approval now also drains *talkDrainMult while talking. Softened curve.
+- Verified: GENTLE default; BEDLAM survivable + white-knuckle (killed bill 1 at ~T3, app/steam scraping).
+- LESSON: dev with `bun run dev` (--hot) — plain `bun` served a stale frontend bundle.
+- Tests 16 pass.
+
 ### Awaiting from user
-- Playtest qwen build: steering/quality good? Pace okay (~9s/turn) or want shorter/faster?
-- Drain comfortable now? Junk prompts still earn weak-positive — punish harder or leave it?
+- Playtest the tiers — is the spread good (GENTLE→BEDLAM)? Any tier feel off?
+- Pace okay (~9s/turn on qwen)? Junk prompts still earn weak-positive — punish harder or leave it?
 - Overall difficulty feel (too-hard/too-easy). Knobs in config.ts TUNING + BILLS.
 - GothicVania town files (optional background) — drop into `assets/` if desired.

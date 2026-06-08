@@ -7,7 +7,10 @@ import {
   BILLS,
   PORTRAIT_COUNT,
   CROWD_REACTIONS,
+  DIFFICULTIES,
+  DIFFICULTY_KEY,
   portraitKey,
+  type Difficulty,
 } from "../config";
 import { PortraitCard } from "../ui/PortraitCard";
 import { Meter } from "../ui/Meter";
@@ -40,6 +43,7 @@ export class GameScene extends Phaser.Scene {
   private billText!: Phaser.GameObjects.Text;
   private crowd: PortraitCard[] = [];
 
+  private diff!: Difficulty;
   private billIndex = 0;
   private held = 0;
   private over = false;
@@ -67,6 +71,7 @@ export class GameScene extends Phaser.Scene {
     this.curSpeech = "";
     this.crowd = [];
     this.cameras.main.setBackgroundColor(COLORS.ink);
+    this.diff = DIFFICULTIES[(this.registry.get(DIFFICULTY_KEY) as number) ?? 0];
     const bill = BILLS[this.billIndex];
 
     // --- Left column ---
@@ -76,7 +81,7 @@ export class GameScene extends Phaser.Scene {
       width: 258, height: 22, color: COLORS.approval, lowColor: COLORS.approvalLow,
       lowThreshold: 0.25, label: "APPROVAL", max: TUNING.approvalMax,
     });
-    this.approval.set(TUNING.approvalStart);
+    this.approval.set(this.diff.approvalStart);
 
     this.steam = new Meter(this, 22, 405, {
       width: 258, height: 22, color: COLORS.steam, lowColor: COLORS.steamLow,
@@ -102,6 +107,10 @@ export class GameScene extends Phaser.Scene {
         fontFamily: FONT, fontSize: "20px", color: CSS.gold, fontStyle: "bold",
       })
       .setOrigin(0.5, 0);
+
+    this.add.text(14, 10, `[ ${this.diff.name} ]`, {
+      fontFamily: FONT, fontSize: "14px", color: CSS.muted,
+    });
 
     this.panel = new SpeechPanel(this, 308, 58, 952, 510);
     this.panel.system("Take the floor — type your OPENING topic and press ENTER.\nThe clock starts when you do.");
@@ -162,15 +171,20 @@ export class GameScene extends Phaser.Scene {
   }
 
   private applyJudge(m: Extract<ServerMessage, { type: "judge" }>) {
-    this.approval.set(this.approval.value + m.approvalDelta);
+    // Difficulty bends the raw verdict: harder = stingier rewards, harsher penalties.
+    const approvalDelta = Math.round(
+      m.approvalDelta >= 0 ? m.approvalDelta * this.diff.rewardMult : m.approvalDelta * this.diff.penaltyMult,
+    );
+    const steamGain = Math.round(m.steamBonus * this.diff.rewardMult);
+
+    this.approval.set(this.approval.value + approvalDelta);
     this.approval.flash();
-    // Steam reward scales with how well the speech landed.
-    this.steam.set(Math.min(TUNING.steamMax, this.steam.value + m.steamBonus));
+    this.steam.set(Math.min(TUNING.steamMax, this.steam.value + steamGain));
     this.steam.flash();
-    const sign = m.approvalDelta >= 0 ? "+" : "";
+    const sign = approvalDelta >= 0 ? "+" : "";
     this.ruling
-      .setColor(m.approvalDelta >= 0 ? CSS.gold : CSS.approval)
-      .setText(`${m.verdict.toUpperCase()}  ${sign}${m.approvalDelta} approval  +${m.steamBonus} steam — ${m.reason}`);
+      .setColor(approvalDelta >= 0 ? CSS.gold : CSS.approval)
+      .setText(`${m.verdict.toUpperCase()}  ${sign}${approvalDelta} approval  +${steamGain} steam — ${m.reason}`);
 
     // Record this turn for the end-of-game discussion.
     if (this.curPrompt) {
@@ -178,18 +192,20 @@ export class GameScene extends Phaser.Scene {
         prompt: this.curPrompt,
         speech: this.curSpeech.trim(),
         verdict: m.verdict,
-        approvalDelta: m.approvalDelta,
+        approvalDelta,
       });
     }
 
-    const pool = CROWD_REACTIONS[m.verdict];
-    const negative = m.verdict === "flop";
+    // The gallery: on harder difficulties they heckle negatively even on decent
+    // speeches (meanness). Each member rolls independently.
     this.crowd.forEach((c, i) =>
       this.time.delayedCall(i * 60, () => {
         if (!c.active) return;
+        const mean = m.verdict === "flop" || Math.random() < this.diff.meanness;
+        const pool = mean ? CROWD_REACTIONS.flop : CROWD_REACTIONS[m.verdict];
         c.react();
-        c.setMood(negative ? COLORS.approvalLow : COLORS.paper);
-        c.say(pool[Math.floor(Math.random() * pool.length)], !negative);
+        c.setMood(mean ? COLORS.approvalLow : COLORS.paper);
+        c.say(pool[Math.floor(Math.random() * pool.length)], !mean);
       }),
     );
     this.speaker.react();
@@ -201,10 +217,16 @@ export class GameScene extends Phaser.Scene {
     this.elapsed += dt;
     const bill = BILLS[this.billIndex];
 
-    // Steam drains gently while the senator holds forth, fast while you're idle.
+    // Both meters drain gently while the senator holds forth (the chamber is
+    // captive), fast in the dead air while you compose the next prompt.
     const drainMult = this.talking ? TUNING.talkDrainMult : 1;
-    this.steam.set(this.steam.value - TUNING.steamDrainPerSec * bill.steamDrainMult * drainMult * dt);
-    this.approval.set(this.approval.value - bill.approvalDrainPerSec * dt);
+    this.steam.set(
+      this.steam.value -
+        TUNING.steamDrainPerSec * bill.steamDrainMult * drainMult * this.diff.steamDrainMult * dt,
+    );
+    this.approval.set(
+      this.approval.value - bill.approvalDrainPerSec * this.diff.approvalDrainMult * drainMult * dt,
+    );
 
     this.held += dt;
     this.progress.set(this.held);
