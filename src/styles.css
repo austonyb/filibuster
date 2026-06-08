@@ -1,0 +1,31 @@
+:root {
+  --ink: #14110d;
+  --paper: #efe7d3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: "Courier New", ui-monospace, monospace;
+  overflow: hidden;
+}
+
+#game {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#game canvas {
+  image-rendering: auto;
+}
