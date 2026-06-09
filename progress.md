@@ -135,3 +135,11 @@
 - Pace okay (~9s/turn on qwen)? Junk prompts still earn weak-positive — punish harder or leave it?
 - Overall difficulty feel (too-hard/too-easy). Knobs in config.ts TUNING + BILLS.
 - GothicVania town files (optional background) — drop into `assets/` if desired.
+
+## Session — 2026-06-08 (docs)
+- Expanded README.md for public sharing. Replaced the stock `bun init` stub.
+- Sourced details from index.ts, src/config.ts, src/server/{senator,ollama}.ts,
+  src/shared/protocol.ts, package.json, CREDITS.md (no invented facts).
+- Covered: pitch, how-it-plays (STEAM/APPROVAL dual-lose, bills, GENTLE..BEDLAM, judging),
+  tech stack (Bun + Phaser 4 + Ollama), arch diagram, prerequisites + run/config
+  (PORT/OLLAMA_URL/FILIBUSTER_MODEL), bun test, project layout, credits.
